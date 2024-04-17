@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"generator_boilerplate/constant"
 	"generator_boilerplate/generator"
 	"generator_boilerplate/types"
 	"log"
@@ -20,16 +21,18 @@ type Server struct {
 }
 
 func NewServer(port string) *Server {
-	return &Server{
+	server := &Server{
 		Port:        port,
 		AddressMap:  make(map[int][]string),
 		ShardsTable: make(map[string]string),
 	}
+	server.ShardsTable = constant.ShardsTable
+	return server
 }
 
 func (s *Server) setRoutes() {
 	http.HandleFunc("/generate_account", s.handleGenerateAccounts)
-	http.HandleFunc("/generate_transaction", s.handleGenerateTransaction)
+	// http.HandleFunc("/generate_transaction", s.handleGenerateTransaction)
 }
 
 func (s *Server) handleGenerateAccounts(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +54,7 @@ func (s *Server) handleGenerateAccounts(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Error generating accounts", http.StatusInternalServerError)
 		return
 	}
-
+	log.Println("Generated Accounts.")
 	msg := types.AccountsMsg{}
 	msg.Content = make([][]byte, len(accounts))
 	for i := 0; i < len(accounts); i++ {

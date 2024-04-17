@@ -9,7 +9,7 @@ import (
 )
 
 func GenerateAccounts(number int) ([]types.Account, error) {
-	var accounts []types.Account
+	accounts := make([]types.Account, number)
 	for i := 0; i < number; i++ {
 		privateKey, err := crypto.GenerateKey()
 		if err != nil {
