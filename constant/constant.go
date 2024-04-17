@@ -1,8 +1,12 @@
 package constant
 
 const (
-	Port    = "8000"
-	Balance = 10000000
+	Port                       = "8000"
+	Balance                    = 10000000
+	TransactionsGeneration     = 1000
+	OverloadTransactionsRatio  = 0.25
+	CrossShardTransactionRatio = 25
+	MaxTxsInBlock              = 20
 )
 
 var ShardsTable = map[string]string{
