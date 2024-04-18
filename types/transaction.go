@@ -3,16 +3,15 @@ package types
 import (
 	"crypto/sha256"
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type Transaction struct {
-	From    string
-	To      string
-	Value   int64
-	Nonce   int64
-	Receipt Receipt
-	Hash    []byte
+	From    string  `json:"from"`
+	To      string  `json:"to"`
+	Value   int64   `json:"value"`
+	Nonce   int64   `json:"nonce"`
+	Receipt Receipt `json:"receipt"`
+	Hash    []byte  `json:"hash"`
 }
 
 func NewTransaction(from, to string, value, nonce int64) Transaction {
@@ -43,16 +42,32 @@ func (t *Transaction) GenerateTransactionHash() error {
 	return nil
 }
 
-func (t *Transaction) RLPEncode() ([]byte, error) {
-	encoded, err := rlp.EncodeToBytes(t)
+//func (t *Transaction) RLPEncode() ([]byte, error) {
+//	encoded, err := rlp.EncodeToBytes(t)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return encoded, nil
+//}
+//
+//func (t *Transaction) RLPDecode(content []byte) error {
+//	err := rlp.DecodeBytes(content, t)
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}
+
+func (t *Transaction) Marshal() ([]byte, error) {
+	encoded, err := json.Marshal(t)
 	if err != nil {
 		return nil, err
 	}
 	return encoded, nil
 }
 
-func (t *Transaction) RLPDecode(content []byte) error {
-	err := rlp.DecodeBytes(content, t)
+func (t *Transaction) Unmarshal(content []byte) error {
+	err := json.Unmarshal(content, t)
 	if err != nil {
 		return err
 	}

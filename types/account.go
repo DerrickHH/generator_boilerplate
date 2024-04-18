@@ -2,8 +2,6 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type Account struct {
@@ -13,14 +11,14 @@ type Account struct {
 	Nonce      int64  `json:"nonce"`
 }
 
-func (a *Account) RLPEncode() ([]byte, error) {
-	encoded, err := rlp.EncodeToBytes(a)
-	fmt.Println(string(encoded))
-	if err != nil {
-		return nil, err
-	}
-	return encoded, nil
-}
+//func (a *Account) RLPEncode() ([]byte, error) {
+//	encoded, err := rlp.EncodeToBytes(a)
+//	fmt.Println(string(encoded))
+//	if err != nil {
+//		return nil, err
+//	}
+//	return encoded, nil
+//}
 
 func (a *Account) Marshal() ([]byte, error) {
 	encoded, err := json.Marshal(a)
@@ -30,13 +28,13 @@ func (a *Account) Marshal() ([]byte, error) {
 	return encoded, nil
 }
 
-func (a *Account) RLPDecode(content []byte) error {
-	err := rlp.DecodeBytes(content, a)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+//func (a *Account) RLPDecode(content []byte) error {
+//	err := rlp.DecodeBytes(content, a)
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}
 
 func (a *Account) Unmarshal(content []byte) error {
 	err := json.Unmarshal(content, a)

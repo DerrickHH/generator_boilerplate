@@ -150,7 +150,7 @@ func (s *Server) handleGenerateTransactions(w http.ResponseWriter, r *http.Reque
 			for i := 0; i < len(generatedTransactions); i++ {
 				switch generatedTransactions[i].(type) {
 				case types.Transaction:
-					msg.Transactions[i], _ = generatedTransactions[i].(*types.Transaction).RLPEncode()
+					msg.Transactions[i], _ = generatedTransactions[i].(*types.Transaction).Marshal()
 				case types.CrossShardTransaction:
 					msg.CrossShardTransactions[i], _ = generatedTransactions[i].(*types.CrossShardTransaction).RLPEncode()
 				}

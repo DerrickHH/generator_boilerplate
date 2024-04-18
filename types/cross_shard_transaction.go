@@ -3,19 +3,18 @@ package types
 import (
 	"crypto/sha256"
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type CrossShardTransaction struct {
-	ShardID int
-	From    string
-	To      string
-	Value   int64
-	Nonce   int64
-	Receipt Receipt
-	Hash    []byte
+	ShardID int     `json:"shard_id"`
+	From    string  `json:"from"`
+	To      string  `json:"to"`
+	Value   int64   `json:"value"`
+	Nonce   int64   `json:"nonce"`
+	Receipt Receipt `json:"receipt"`
+	Hash    []byte  `json:"hash"`
 	// NOTE: proof 字段在填充前需要先 json 编码
-	Proof []byte
+	Proof []byte `json:"proof"`
 }
 
 func NewCrossShardTransaction(shardID int, from, to string, value, nonce int64) CrossShardTransaction {
@@ -48,18 +47,34 @@ func (cst *CrossShardTransaction) GenerateTransactionHash() error {
 	return nil
 }
 
-func (cst *CrossShardTransaction) RLPEncode() ([]byte, error) {
-	encoded, err := rlp.EncodeToBytes(cst)
+//func (cst *CrossShardTransaction) RLPEncode() ([]byte, error) {
+//	encoded, err := rlp.EncodeToBytes(cst)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return encoded, nil
+//}
+//
+//func (cst *CrossShardTransaction) RLPDecode(content []byte) error {
+//	err := rlp.DecodeBytes(content, cst)
+//	if err != nil {
+//		return nil
+//	}
+//	return nil
+//}
+
+func (cst *CrossShardTransaction) Marshal() ([]byte, error) {
+	encoded, err := json.Marshal(cst)
 	if err != nil {
 		return nil, err
 	}
 	return encoded, nil
 }
 
-func (cst *CrossShardTransaction) RLPDecode(content []byte) error {
-	err := rlp.DecodeBytes(content, cst)
+func (cst *CrossShardTransaction) Unmarshal(content []byte) error {
+	err := json.Unmarshal(content, cst)
 	if err != nil {
-		return nil
+		return err
 	}
 	return nil
 }
