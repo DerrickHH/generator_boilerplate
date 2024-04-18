@@ -28,7 +28,7 @@ func GenerateAccounts(number int) ([]types.Account, error) {
 			Address:    address,
 			Balance:    constant.Balance,
 			Nonce:      0,
-			ShardList:  make([]int, 0),
+			// ShardList:  make([]int, 0),
 		}
 	}
 	return accounts, nil
