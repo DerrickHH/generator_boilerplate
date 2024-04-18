@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+var SequenceID = 1
+
 type Server struct {
 	Port string
 	// NOTE: 用于生成transaction
@@ -141,23 +143,27 @@ func (s *Server) handleGenerateTransactions(w http.ResponseWriter, r *http.Reque
 			}
 			log.Println("========== Generated Transactions ==========")
 
-			msg := types.TransactionsMsg{}
-			msg.Content = make([][]byte, len(generatedTransactions))
+			msg := types.RequestMsg{}
+			msg.Timestamp = time.Now().UnixNano()
+			msg.Transactions = make([][]byte, trans)
+			msg.CrossShardTransactions = make([][]byte, ctrans)
 			for i := 0; i < len(generatedTransactions); i++ {
 				switch generatedTransactions[i].(type) {
-				case types.TransactionsMsg:
-					msg.Content[i], _ = generatedTransactions[i].(*types.Transaction).RLPEncode()
+				case types.Transaction:
+					msg.Transactions[i], _ = generatedTransactions[i].(*types.Transaction).RLPEncode()
 				case types.CrossShardTransaction:
-					msg.Content[i], _ = generatedTransactions[i].(*types.CrossShardTransaction).RLPEncode()
+					msg.CrossShardTransactions[i], _ = generatedTransactions[i].(*types.CrossShardTransaction).RLPEncode()
 				}
 			}
+			msg.SequenceID = int64(SequenceID)
+			SequenceID++
 			msg.TransactionNumber = len(generatedTransactions)
 			jsonData, err := json.Marshal(msg)
 			if err != nil {
 				log.Fatalf("Failed to JSON marshal account: %v", err)
 			}
 
-			resp, err := http.Post(s.ShardsTable[fmt.Sprintf("Shard_%d", shardID)]+"/transactions", "application/json", bytes.NewBuffer(jsonData))
+			resp, err := http.Post(s.ShardsTable[fmt.Sprintf("Shard_%d", shardID)]+"/req", "application/json", bytes.NewBuffer(jsonData))
 			if err != nil {
 				log.Fatalf("Failed to send transactions to shard: %v", err)
 			}
