@@ -10,7 +10,7 @@ const (
 )
 
 var ShardsTable = map[string]string{
-	"Shard_1": "http://127.0.0.1:6000",
-	"Shard_2": "http://127.0.0.1:7000",
-	"Shard_3": "http://127.0.0.1:8000",
+	"Shard_0": "http://127.0.0.1:9200",
+	"Shard_1": "http://127.0.0.1:7000",
+	"Shard_2": "http://127.0.0.1:8000",
 }

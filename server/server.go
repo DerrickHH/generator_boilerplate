@@ -66,14 +66,14 @@ func (s *Server) handleGenerateAccounts(w http.ResponseWriter, r *http.Request) 
 	msg := types.AccountsMsg{}
 	msg.Content = make([][]byte, len(accounts))
 	for i := 0; i < len(accounts); i++ {
-		msg.Content[i], _ = accounts[i].RLPEncode()
+		msg.Content[i], _ = accounts[i].Marshal()
 	}
 	msg.AddressNumber = accNumber
 	jsonData, err := json.Marshal(msg)
 	if err != nil {
 		log.Fatalf("Failed to JSON marshal account: %v", err)
 	}
-
+	fmt.Println(string(jsonData))
 	resp, err := http.Post(s.ShardsTable[fmt.Sprintf("Shard_%d", shardID)]+"/accounts", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Fatalf("Failed to send account to shard: %v", err)
@@ -152,7 +152,7 @@ func (s *Server) handleGenerateTransactions(w http.ResponseWriter, r *http.Reque
 				case types.Transaction:
 					msg.Transactions[i], _ = generatedTransactions[i].(*types.Transaction).Marshal()
 				case types.CrossShardTransaction:
-					msg.CrossShardTransactions[i], _ = generatedTransactions[i].(*types.CrossShardTransaction).RLPEncode()
+					msg.CrossShardTransactions[i], _ = generatedTransactions[i].(*types.CrossShardTransaction).Marshal()
 				}
 			}
 			msg.SequenceID = int64(SequenceID)
