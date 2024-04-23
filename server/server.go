@@ -145,20 +145,23 @@ func (s *Server) handleGenerateTransactions(w http.ResponseWriter, r *http.Reque
 
 			msg := types.RequestMsg{}
 			msg.Timestamp = time.Now().UnixNano()
-			msg.Transactions = make([][]byte, trans)
-			msg.CrossShardTransactions = make([][]byte, ctrans)
+			msg.Transactions = make([][]byte, 0)
+			msg.CrossShardTransactions = make([][]byte, 0)
 			for i := 0; i < len(generatedTransactions); i++ {
 				switch generatedTransactions[i].(type) {
-				case types.Transaction:
-					msg.Transactions[i], _ = generatedTransactions[i].(*types.Transaction).Marshal()
-				case types.CrossShardTransaction:
-					msg.CrossShardTransactions[i], _ = generatedTransactions[i].(*types.CrossShardTransaction).Marshal()
+				case *types.Transaction:
+					transaction, _ := generatedTransactions[i].(*types.Transaction).Marshal()
+					msg.Transactions = append(msg.Transactions, transaction)
+				case *types.CrossShardTransaction:
+					cstransaction, _ := generatedTransactions[i].(*types.CrossShardTransaction).Marshal()
+					msg.CrossShardTransactions = append(msg.CrossShardTransactions, cstransaction)
 				}
 			}
 			msg.SequenceID = int64(SequenceID)
 			SequenceID++
 			msg.TransactionNumber = len(generatedTransactions)
 			jsonData, err := json.Marshal(msg)
+			fmt.Println(string(jsonData))
 			if err != nil {
 				log.Fatalf("Failed to JSON marshal account: %v", err)
 			}
