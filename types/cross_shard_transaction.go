@@ -13,8 +13,6 @@ type CrossShardTransaction struct {
 	Nonce   int64   `json:"nonce"`
 	Receipt Receipt `json:"receipt"`
 	Hash    []byte  `json:"hash"`
-	// NOTE: proof 字段在填充前需要先 json 编码
-	Proof []byte `json:"proof"`
 }
 
 func NewCrossShardTransaction(shardID int, from, to string, value, nonce int64) CrossShardTransaction {
@@ -46,22 +44,6 @@ func (cst *CrossShardTransaction) GenerateTransactionHash() error {
 	cst.Hash = hash[:]
 	return nil
 }
-
-//func (cst *CrossShardTransaction) RLPEncode() ([]byte, error) {
-//	encoded, err := rlp.EncodeToBytes(cst)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return encoded, nil
-//}
-//
-//func (cst *CrossShardTransaction) RLPDecode(content []byte) error {
-//	err := rlp.DecodeBytes(content, cst)
-//	if err != nil {
-//		return nil
-//	}
-//	return nil
-//}
 
 func (cst *CrossShardTransaction) Marshal() ([]byte, error) {
 	encoded, err := json.Marshal(cst)

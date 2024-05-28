@@ -42,22 +42,6 @@ func (t *Transaction) GenerateTransactionHash() error {
 	return nil
 }
 
-//func (t *Transaction) RLPEncode() ([]byte, error) {
-//	encoded, err := rlp.EncodeToBytes(t)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return encoded, nil
-//}
-//
-//func (t *Transaction) RLPDecode(content []byte) error {
-//	err := rlp.DecodeBytes(content, t)
-//	if err != nil {
-//		return err
-//	}
-//	return nil
-//}
-
 func (t *Transaction) Marshal() ([]byte, error) {
 	encoded, err := json.Marshal(t)
 	if err != nil {
