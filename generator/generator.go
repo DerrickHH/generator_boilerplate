@@ -12,22 +12,22 @@ import (
 	"reflect"
 )
 
-func GenerateAccounts(number int) ([]types.Account, error) {
-	accounts := make([]types.Account, number)
+func GenerateAccounts(number int) ([]types.AccountState, error) {
+	accounts := make([]types.AccountState, number)
 	for i := 0; i < number; i++ {
 		privateKey, err := crypto.GenerateKey()
 		if err != nil {
 			log.Fatalf("Failed to generate private key: %v", err)
 		}
 
-		privateKeyBytes := crypto.FromECDSA(privateKey)
+		// privateKeyBytes := crypto.FromECDSA(privateKey)
 		address := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
 
-		accounts[i] = types.Account{
-			PrivateKey: fmt.Sprintf("0x%x", privateKeyBytes),
-			Address:    address,
-			Balance:    constant.Balance,
-			Nonce:      0,
+		accounts[i] = types.AccountState{
+			PublicKey: crypto.FromECDSAPub(&privateKey.PublicKey),
+			Address:   address,
+			Balance:   big.NewInt(constant.Balance),
+			Nonce:     0,
 			// ShardList:  make([]int, 0),
 		}
 	}
