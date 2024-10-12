@@ -1,6 +1,7 @@
 package constant
 
 const (
+	Url                        = "http://127.0.0.1"
 	Port                       = "8000"
 	Balance                    = 10000000
 	TransactionsGeneration     = 10

@@ -3,25 +3,37 @@ package types
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"generator_boilerplate/utils"
+	"math/big"
+	"time"
 )
 
 type Transaction struct {
-	From    string  `json:"from"`
-	To      string  `json:"to"`
-	Value   int64   `json:"value"`
-	Nonce   int64   `json:"nonce"`
-	Receipt Receipt `json:"receipt"`
-	Hash    []byte  `json:"hash"`
+	From      utils.Address `json:"from"`
+	To        utils.Address `json:"to"`
+	Value     *big.Int      `json:"value"`
+	Signature []byte        `json:"signature"`
+	Nonce     uint64        `json:"nonce"`
+	Hash      []byte        `json:"hash"`
+	Time      time.Time     `json:"time"`
+	// used in transaction relaying
+	Relayed bool `json:"relayed"`
 }
 
-func NewTransaction(from, to string, value, nonce int64) Transaction {
-	return Transaction{
-		From:    from,
-		To:      to,
-		Value:   value,
-		Nonce:   nonce,
-		Receipt: Receipt{},
+func NewTransaction(from, to string, value *big.Int, nonce uint64) *Transaction {
+	tx := &Transaction{
+		From:  from,
+		To:    to,
+		Value: value,
+		Nonce: nonce,
+		Time:  time.Now(),
 	}
+
+	txMar, _ := json.Marshal(tx)
+	hash := sha256.Sum256(txMar)
+	tx.Hash = hash[:]
+	tx.Relayed = false
+	return tx
 }
 
 func (t *Transaction) GenerateTransactionHash() error {

@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	port := constant.Port
-	ser := server.NewServer(port)
+	url := constant.Url
+	ser := server.NewServer(url)
 	ser.Start()
 }

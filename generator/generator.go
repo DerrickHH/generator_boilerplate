@@ -34,7 +34,7 @@ func GenerateAccounts(number int) ([]types.AccountState, error) {
 	return accounts, nil
 }
 
-func GenerateTransaction(addresses []types.Account, counter *map[string]int, repetitive *map[string][]string, noncer *map[string]int64) (*types.Transaction, error) {
+func GenerateTransaction(addresses []*types.AccountState, counter *map[string]int, repetitive *map[string][]string, noncer *map[string]int64) (*types.Transaction, error) {
 	indexFrom, indexTo := 0, 0
 	for indexFrom == indexTo {
 		indexFromInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addresses))))
@@ -48,11 +48,11 @@ func GenerateTransaction(addresses []types.Account, counter *map[string]int, rep
 	if (*counter)[addresses[indexFrom].Address] >= constant.MaxTxsInBlock {
 		return &types.Transaction{}, errors.New("transaction counter has exceed")
 	}
-	if addresses[indexFrom].Balance < 1 {
+	if addresses[indexFrom].Balance.Cmp(big.NewInt(1)) == -1 {
 		return &types.Transaction{}, errors.New("no sufficient balance")
 	}
 	newTx := types.NewTransaction(addresses[indexFrom].Address,
-		addresses[indexTo].Address, 1, (*noncer)[addresses[indexFrom].Address])
+		addresses[indexTo].Address, big.NewInt(1), uint64((*noncer)[addresses[indexFrom].Address]))
 	_ = newTx.GenerateTransactionHash()
 	if reflect.DeepEqual(newTx.Hash, []byte("")) {
 		// log.Error("[ERROR] Wrong when generate the transaction: nil hash.")
@@ -61,18 +61,18 @@ func GenerateTransaction(addresses []types.Account, counter *map[string]int, rep
 	(*repetitive)[addresses[indexFrom].Address] = append((*repetitive)[addresses[indexFrom].Address], addresses[indexTo].Address)
 	(*noncer)[addresses[indexFrom].Address] += 1
 	(*counter)[addresses[indexFrom].Address] += 1
-	return &newTx, nil
+	return newTx, nil
 }
 
-func GenerateCrossShardTransaction(shardID int, addressMap map[int][]types.Account, counter *map[string]int, repetitive *map[string][]string, noncer *map[string]int64) (*types.CrossShardTransaction, error) {
+func GenerateCrossShardTransaction(shardID int, addressMap map[int][]*types.AccountState, counter *map[string]int, repetitive *map[string][]string, noncer *map[string]int64) (*types.Transaction, error) {
 	fmt.Println("The length of addressMap is: ", len(addressMap))
 	txIndexFromInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addressMap[shardID]))))
 	txIndexFrom := int(txIndexFromInt64.Int64())
 	if (*counter)[addressMap[shardID][txIndexFrom].Address] >= constant.MaxTxsInBlock {
-		return &types.CrossShardTransaction{}, errors.New("counter has exceed")
+		return &types.Transaction{}, errors.New("counter has exceed")
 	}
-	if addressMap[shardID][txIndexFrom].Balance < 1 {
-		return &types.CrossShardTransaction{}, errors.New("no sufficient balance")
+	if addressMap[shardID][txIndexFrom].Balance.Cmp(big.NewInt(1)) == -1 {
+		return &types.Transaction{}, errors.New("no sufficient balance")
 	}
 	indexTo := shardID
 	for indexTo == shardID {
@@ -85,18 +85,18 @@ func GenerateCrossShardTransaction(shardID int, addressMap map[int][]types.Accou
 	txIndexTo := int(txIndexToInt64.Int64())
 	// 如果这对组合的交易已经存在的，也不能保留
 	if containsString(addressMap[indexTo][txIndexTo].Address, (*repetitive)[addressMap[shardID][txIndexFrom].Address]) {
-		return &types.CrossShardTransaction{}, errors.New("repetitive from and to")
+		return &types.Transaction{}, errors.New("repetitive from and to")
 	}
-	newTx := types.NewCrossShardTransaction(shardID, addressMap[shardID][txIndexFrom].Address,
-		addressMap[indexTo][txIndexTo].Address, 1, (*noncer)[addressMap[shardID][txIndexFrom].Address])
+	newTx := types.NewTransaction(addressMap[shardID][txIndexFrom].Address,
+		addressMap[indexTo][txIndexTo].Address, big.NewInt(1), uint64((*noncer)[addressMap[shardID][txIndexFrom].Address]))
 	_ = newTx.GenerateTransactionHash()
 	if reflect.DeepEqual(newTx.Hash, []byte("")) {
-		return &types.CrossShardTransaction{}, errors.New("wrong tx hash")
+		return &types.Transaction{}, errors.New("wrong tx hash")
 	}
 	(*repetitive)[addressMap[shardID][txIndexFrom].Address] = append((*repetitive)[addressMap[shardID][txIndexFrom].Address], addressMap[indexTo][txIndexTo].Address)
 	(*noncer)[addressMap[shardID][txIndexFrom].Address] += 1
 	(*counter)[addressMap[shardID][txIndexFrom].Address] += 1
-	return &newTx, nil
+	return newTx, nil
 }
 
 func containsString(item string, items []string) bool {
