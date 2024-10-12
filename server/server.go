@@ -321,6 +321,9 @@ func (s *Server) GenerateAccount(msg *types.GenerateAccountRequest) error {
 	accountsMsg.AddressNumber = len(s.AddressMap[msg.ShardID])
 	jsonMsg, _ := json.Marshal(accountsMsg)
 	send(s.BeaconNode+"/accounts", jsonMsg)
+	for _, shard := range s.ShardsTable {
+		send(shard+"/accounts", jsonMsg)
+	}
 	log.Println("Generated Accounts.")
 	return nil
 }
