@@ -1,45 +1,63 @@
 package types
 
 import (
-	"crypto/sha256"
 	"encoding/json"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/consensys/gnark-crypto/ecc/bn254/twistededwards/eddsa"
+	"hash"
+	"time"
 )
 
 type Transaction struct {
-	From    string  `json:"from"`
-	To      string  `json:"to"`
-	Value   int64   `json:"value"`
-	Nonce   int64   `json:"nonce"`
-	Receipt Receipt `json:"receipt"`
-	Hash    []byte  `json:"hash"`
+	Nonce          uint64
+	Amount         fr.Element
+	SenderPubKey   eddsa.PublicKey
+	ReceiverPubKey eddsa.PublicKey
+	Signature      eddsa.Signature
+	Time           time.Time
 }
 
-func NewTransaction(from, to string, value, nonce int64) Transaction {
-	return Transaction{
-		From:    from,
-		To:      to,
-		Value:   value,
-		Nonce:   nonce,
-		Receipt: Receipt{},
-	}
+func (t *Transaction) SetSign(hFunc hash.Hash, privateKey eddsa.PrivateKey) {
+	t.Signature = t.Sign(hFunc, privateKey)
 }
 
-func (t *Transaction) GenerateTransactionHash() error {
-	txData := Transaction{
-		From:  t.From,
-		To:    t.To,
-		Value: t.Value,
-		Nonce: t.Nonce,
-	}
+func (t *Transaction) Sign(hFunc hash.Hash, privateKey eddsa.PrivateKey) eddsa.Signature {
+	msg := t.GenerateTransactionHash(hFunc)
+	return Sign(msg, privateKey, hFunc)
+}
 
-	data, err := json.Marshal(txData)
-	if err != nil {
-		return err
-	}
+func (t *Transaction) GenerateTransactionHash(hFunc hash.Hash) []byte {
+	hFunc.Reset()
 
-	hash := sha256.Sum256(data)
-	t.Hash = hash[:]
-	return nil
+	var frNonce fr.Element
+
+	// conver uint64 to bytes
+	frNonce.SetUint64(t.Nonce)
+	nonceBytes := frNonce.Bytes()
+	hFunc.Write(nonceBytes[:])
+	buf1 := t.Amount.Bytes()
+	hFunc.Write(buf1[:])
+
+	buf1 = t.SenderPubKey.A.X.Bytes()
+	hFunc.Write(buf1[:])
+
+	buf1 = t.SenderPubKey.A.Y.Bytes()
+	hFunc.Write(buf1[:])
+
+	buf1 = t.ReceiverPubKey.A.X.Bytes()
+	hFunc.Write(buf1[:])
+
+	buf1 = t.ReceiverPubKey.A.Y.Bytes()
+	hFunc.Write(buf1[:])
+
+	hashSum := hFunc.Sum(nil)
+
+	return hashSum
+}
+
+func (t *Transaction) VerifySignature(hFunc hash.Hash) (bool, error) {
+	msg := t.GenerateTransactionHash(hFunc)
+	return Verify(msg, t.SenderPubKey, t.Signature.Bytes(), hFunc)
 }
 
 func (t *Transaction) Marshal() ([]byte, error) {

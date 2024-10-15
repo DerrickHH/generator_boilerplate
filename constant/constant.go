@@ -1,6 +1,7 @@
 package constant
 
 const (
+	Url                        = "http://127.0.0.1"
 	Port                       = "8000"
 	Balance                    = 10000000
 	TransactionsGeneration     = 10
@@ -14,3 +15,5 @@ var ShardsTable = map[string]string{
 	"Shard_1": "http://127.0.0.1:10200",
 	"Shard_2": "http://127.0.0.1:8000",
 }
+
+var BeaconNode = "http://127.0.0.1:8888"
