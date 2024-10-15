@@ -4,13 +4,17 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"generator_boilerplate/constant"
 	"generator_boilerplate/generator"
 	"generator_boilerplate/types"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
 	"log"
 	"math/big"
 	"net/http"
+	"reflect"
 	"time"
 )
 
@@ -199,7 +203,7 @@ func (s *Server) GenerateTransaction(req *types.GenerateTransactionRequest) erro
 	for trans+ctrans < number {
 		rnd, _ := rand.Int(rand.Reader, big.NewInt(100))
 		if int(rnd.Int64()) > req.CrossShardRatio {
-			tx, err := generator.GenerateTransaction(s.AddressMap[req.ShardID], &counter, &repetitive, &noncer)
+			tx, err := s.CreateTransaction(s.AddressMap[req.ShardID], &counter, &repetitive, &noncer)
 			if err != nil {
 				log.Println("[ERROR] Wrong when generating the transactions: ", err)
 				continue
@@ -207,7 +211,7 @@ func (s *Server) GenerateTransaction(req *types.GenerateTransactionRequest) erro
 			generatedTransactions = append(generatedTransactions, *tx)
 			trans += 1
 		} else {
-			ctx, err := generator.GenerateCrossShardTransaction(req.ShardID, s.AddressMap, &counter, &repetitive, &noncer)
+			ctx, err := s.CreateCrossShardTransaction(req.ShardID, s.AddressMap, &counter, &repetitive, &noncer)
 			if err != nil {
 				log.Println("[ERROR] Wrong when generating the cross shard transactions: ", err)
 				continue
@@ -246,7 +250,81 @@ func (s *Server) Start() {
 	}
 }
 
+func (s *Server) CreateTransaction(addresses []*types.AccountState, counter *map[string]int, repetitive *map[string][]string, noncer *map[string]int64) (*types.Transaction, error) {
+	indexFrom, indexTo := 0, 0
+	for indexFrom == indexTo {
+		indexFromInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addresses))))
+		indexFrom = int(indexFromInt64.Int64())
+		indexToInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addresses))))
+		indexTo = int(indexToInt64.Int64())
+	}
+	if containsString(addresses[indexTo].Address, (*repetitive)[addresses[indexFrom].Address]) {
+		return &types.Transaction{}, errors.New("repetitive from and to")
+	}
+	if (*counter)[addresses[indexFrom].Address] >= constant.MaxTxsInBlock {
+		return &types.Transaction{}, errors.New("transaction counter has exceed")
+	}
+	minBalance := fr.NewElement(1)
+	if addresses[indexFrom].Balance.Cmp(&minBalance) == -1 {
+		return &types.Transaction{}, errors.New("no sufficient balance")
+	}
+	newTx := types.NewTransaction(uint64(1), addresses[indexFrom].PublicKey, addresses[indexTo].PublicKey, 0)
+	if reflect.DeepEqual(newTx.GenerateTransactionHash(mimc.NewMiMC()), []byte("")) {
+		// log.Error("[ERROR] Wrong when generate the transaction: nil hash.")
+		return &types.Transaction{}, errors.New("wrong tx hash")
+	}
+	(*repetitive)[addresses[indexFrom].Address] = append((*repetitive)[addresses[indexFrom].Address], addresses[indexTo].Address)
+	(*noncer)[addresses[indexFrom].Address] += 1
+	(*counter)[addresses[indexFrom].Address] += 1
+	newTx.Time = time.Now()
+	return &newTx, nil
+}
+
+func (s *Server) CreateCrossShardTransaction(shardID int, addressMap map[int][]*types.AccountState, counter *map[string]int, repetitive *map[string][]string, noncer *map[string]int64) (*types.Transaction, error) {
+	fmt.Println("The length of addressMap is: ", len(addressMap))
+	txIndexFromInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addressMap[shardID]))))
+	txIndexFrom := int(txIndexFromInt64.Int64())
+	if (*counter)[addressMap[shardID][txIndexFrom].Address] >= constant.MaxTxsInBlock {
+		return &types.Transaction{}, errors.New("counter has exceed")
+	}
+	minBalance := fr.NewElement(1)
+	if addressMap[shardID][txIndexFrom].Balance.Cmp(&minBalance) == -1 {
+		return &types.Transaction{}, errors.New("no sufficient balance")
+	}
+	indexTo := shardID
+	for indexTo == shardID {
+		// 根据 全局 的 constant 计算 目标 shard 是谁
+		indexToInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addressMap))))
+		indexTo = int(indexToInt64.Int64())
+	}
+	fmt.Println("indexTo is: ", indexTo)
+	txIndexToInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addressMap[indexTo]))))
+	txIndexTo := int(txIndexToInt64.Int64())
+	// 如果这对组合的交易已经存在的，也不能保留
+	if containsString(addressMap[indexTo][txIndexTo].Address, (*repetitive)[addressMap[shardID][txIndexFrom].Address]) {
+		return &types.Transaction{}, errors.New("repetitive from and to")
+	}
+	newTx := types.NewTransaction(uint64(1), addressMap[shardID][txIndexFrom].PublicKey, addressMap[indexTo][txIndexTo].PublicKey, 0)
+	if reflect.DeepEqual(newTx.GenerateTransactionHash(mimc.NewMiMC()), []byte("")) {
+		return &types.Transaction{}, errors.New("wrong tx hash")
+	}
+	(*repetitive)[addressMap[shardID][txIndexFrom].Address] = append((*repetitive)[addressMap[shardID][txIndexFrom].Address], addressMap[indexTo][txIndexTo].Address)
+	(*noncer)[addressMap[shardID][txIndexFrom].Address] += 1
+	(*counter)[addressMap[shardID][txIndexFrom].Address] += 1
+	newTx.Time = time.Now()
+	return &newTx, nil
+}
+
 func send(url string, msg []byte) {
 	buff := bytes.NewBuffer(msg)
 	http.Post("http://"+url, "application/json", buff)
+}
+
+func containsString(item string, items []string) bool {
+	for _, val := range items {
+		if val == item {
+			return true
+		}
+	}
+	return false
 }

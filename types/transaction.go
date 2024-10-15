@@ -17,6 +17,15 @@ type Transaction struct {
 	Time           time.Time
 }
 
+func NewTransaction(amount uint64, from, to eddsa.PublicKey, nonce uint64) Transaction {
+	var t Transaction
+	t.Amount = fr.NewElement(amount)
+	t.SenderPubKey = from
+	t.ReceiverPubKey = to
+	t.Nonce = nonce
+	return t
+}
+
 func (t *Transaction) SetSign(hFunc hash.Hash, privateKey eddsa.PrivateKey) {
 	t.Signature = t.Sign(hFunc, privateKey)
 }
