@@ -21,9 +21,9 @@ type Server struct {
 	// NOTE: 用于生成transaction
 	AddressMap map[int][]*types.AccountState
 	// NOTE: 用于记录每个 shard 的 #0 节点
-	ShardsTable map[string]string
-	BeaconNode  string
-
+	ShardsTable     map[string]string
+	BeaconNode      string
+	AccountsKeyMap  map[int]map[uint64]types.SignatureAccount
 	AccountsMsg     []*types.AccountsMsg
 	TransactionsMsg []*types.RequestMsg
 
@@ -45,7 +45,7 @@ func NewServer(url string) *Server {
 		BeaconNode:      constant.BeaconNode,
 		AccountsMsg:     make([]*types.AccountsMsg, 0),
 		TransactionsMsg: make([]*types.RequestMsg, 0),
-
+		AccountsKeyMap:  make(map[int]map[uint64]types.SignatureAccount),
 		MsgBuffer: &MsgBuffer{
 			GenerateAccountsRequests:     make([]*types.GenerateAccountRequest, 0),
 			GenerateTransactionsRequests: make([]*types.GenerateTransactionRequest, 0),
@@ -161,10 +161,8 @@ func (s *Server) resolveGenerateTransactionRequest(msgs []*types.GenerateTransac
 }
 
 func (s *Server) GenerateAccount(msg *types.GenerateAccountRequest) error {
-	accounts, err := generator.GenerateAccounts(msg.Number)
-	if err != nil {
-		return err
-	}
+	accounts, accountsMap := generator.GenerateAccounts(msg.Number)
+	s.AccountsKeyMap[msg.ShardID] = accountsMap
 	accountsMsg := &types.AccountsMsg{
 		Content: make([][]byte, 0),
 		ShardID: msg.ShardID,
@@ -173,7 +171,7 @@ func (s *Server) GenerateAccount(msg *types.GenerateAccountRequest) error {
 	for _, acc := range accounts {
 		accMar := acc.Marshal()
 		accountsMsg.Content = append(accountsMsg.Content, accMar)
-		s.AddressMap[msg.ShardID] = append(s.AddressMap[msg.ShardID], &acc)
+		s.AddressMap[msg.ShardID] = append(s.AddressMap[msg.ShardID], acc)
 	}
 	accountsMsg.AddressNumber = len(s.AddressMap[msg.ShardID])
 	jsonMsg, _ := json.Marshal(accountsMsg)

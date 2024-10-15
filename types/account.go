@@ -11,7 +11,7 @@ type Address = string
 
 const AccountSizeInBytes = 160
 
-type Signature struct {
+type SignatureAccount struct {
 	PubKey  eddsa.PublicKey
 	PrivKey eddsa.PrivateKey
 }

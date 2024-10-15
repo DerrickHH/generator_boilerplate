@@ -6,32 +6,30 @@ import (
 	"fmt"
 	"generator_boilerplate/constant"
 	"generator_boilerplate/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"log"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"math/big"
 	"reflect"
 )
 
-func GenerateAccounts(number int) ([]types.Account, error) {
-	accounts := make([]types.Account, number)
-	for i := 0; i < number; i++ {
-		privateKey, err := crypto.GenerateKey()
-		if err != nil {
-			log.Fatalf("Failed to generate private key: %v", err)
+func GenerateAccounts(number int) ([]*types.AccountState, map[uint64]types.SignatureAccount) {
+	accounts := make([]*types.AccountState, number)
+	accountsMap := make(map[uint64]types.SignatureAccount)
+	for i := uint64(0); i < uint64(number); i++ {
+		privKey, pubKey := types.GenerateKeys(int64(i))
+		accountsMap[i] = types.SignatureAccount{
+			PubKey:  pubKey,
+			PrivKey: privKey,
+		}
+		chainAccount := types.AccountState{
+			Index:     i,
+			Nonce:     0,
+			Balance:   fr.NewElement((i + 1) * 60),
+			PublicKey: pubKey,
 		}
 
-		privateKeyBytes := crypto.FromECDSA(privateKey)
-		address := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
-
-		accounts[i] = types.Account{
-			PrivateKey: fmt.Sprintf("0x%x", privateKeyBytes),
-			Address:    address,
-			Balance:    constant.Balance,
-			Nonce:      0,
-			// ShardList:  make([]int, 0),
-		}
+		accounts = append(accounts, &chainAccount)
 	}
-	return accounts, nil
+	return accounts, accountsMap
 }
 
 func GenerateTransaction(addresses []types.Account, counter *map[string]int, repetitive *map[string][]string, noncer *map[string]int64) (*types.Transaction, error) {
