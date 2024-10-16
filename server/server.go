@@ -23,7 +23,7 @@ var SequenceID = 1
 type Server struct {
 	Url string
 	// NOTE: 用于生成transaction
-	AddressMap map[int][]*types.AccountState
+	AddressMap map[int]map[uint64]*types.AccountState
 	// NOTE: 用于记录每个 shard 的 #0 节点
 	ShardsTable     map[string]string
 	BeaconNode      string
@@ -44,7 +44,7 @@ type MsgBuffer struct {
 func NewServer(url string) *Server {
 	server := &Server{
 		Url:             url + ":" + constant.Port,
-		AddressMap:      make(map[int][]*types.AccountState),
+		AddressMap:      make(map[int]map[uint64]*types.AccountState),
 		ShardsTable:     make(map[string]string),
 		BeaconNode:      constant.BeaconNode,
 		AccountsMsg:     make([]*types.AccountsMsg, 0),
@@ -171,11 +171,11 @@ func (s *Server) GenerateAccount(msg *types.GenerateAccountRequest) error {
 		Content: make([][]byte, 0),
 		ShardID: msg.ShardID,
 	}
-	s.AddressMap[msg.ShardID] = make([]*types.AccountState, 0)
+	s.AddressMap[msg.ShardID] = make(map[uint64]*types.AccountState)
 	for _, acc := range accounts {
 		accMar := acc.Marshal()
 		accountsMsg.Content = append(accountsMsg.Content, accMar)
-		s.AddressMap[msg.ShardID] = append(s.AddressMap[msg.ShardID], acc)
+		s.AddressMap[msg.ShardID][acc.Index] = acc
 	}
 	accountsMsg.AddressNumber = len(s.AddressMap[msg.ShardID])
 	jsonMsg, _ := json.Marshal(accountsMsg)
@@ -190,14 +190,15 @@ func (s *Server) GenerateTransaction(req *types.GenerateTransactionRequest) erro
 	log.Println("========== Generating Transactions ==========")
 	generatedTransactions := make([]types.Transaction, 0)
 	// NOTE: 增加一个计数器，保证交易的分散性
-	counter := make(map[string]int)
+	counter := make(map[uint64]int)
 	// NOTE: 控制交易重复
-	repetitive := make(map[string][]string)
+	repetitive := make(map[uint64][]uint64)
 	// NOTE: 控制 nonce
-	noncer := make(map[string]int64)
-	for _, acc := range s.AddressMap[req.ShardID] {
-		counter[acc.Address] = 0
-		repetitive[acc.Address] = make([]string, 0)
+	noncer := make(map[uint64]int64)
+	accs := s.AddressMap[req.ShardID]
+	for k, _ := range accs {
+		counter[k] = 0
+		repetitive[k] = make([]uint64, 0)
 	}
 	trans, ctrans := 0, 0
 	for trans+ctrans < number {
@@ -211,7 +212,7 @@ func (s *Server) GenerateTransaction(req *types.GenerateTransactionRequest) erro
 			generatedTransactions = append(generatedTransactions, *tx)
 			trans += 1
 		} else {
-			ctx, err := s.CreateCrossShardTransaction(req.ShardID, s.AddressMap, &counter, &repetitive, &noncer)
+			ctx, err := s.CreateCrossShardTransaction(req.ShardID, &counter, &repetitive, &noncer)
 			if err != nil {
 				log.Println("[ERROR] Wrong when generating the cross shard transactions: ", err)
 				continue
@@ -250,18 +251,19 @@ func (s *Server) Start() {
 	}
 }
 
-func (s *Server) CreateTransaction(addresses []*types.AccountState, counter *map[string]int, repetitive *map[string][]string, noncer *map[string]int64) (*types.Transaction, error) {
-	indexFrom, indexTo := 0, 0
+func (s *Server) CreateTransaction(addresses map[uint64]*types.AccountState, counter *map[uint64]int, repetitive *map[uint64][]uint64, noncer *map[uint64]int64) (*types.Transaction, error) {
+	indexFrom, indexTo := uint64(0), uint64(0)
+	// NOTE: 严格控制 account 的 index 即可
 	for indexFrom == indexTo {
 		indexFromInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addresses))))
-		indexFrom = int(indexFromInt64.Int64())
+		indexFrom = indexFromInt64.Uint64()
 		indexToInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addresses))))
-		indexTo = int(indexToInt64.Int64())
+		indexTo = indexToInt64.Uint64()
 	}
-	if containsString(addresses[indexTo].Address, (*repetitive)[addresses[indexFrom].Address]) {
+	if containsUint64(addresses[indexTo].Index, (*repetitive)[addresses[indexFrom].Index]) {
 		return &types.Transaction{}, errors.New("repetitive from and to")
 	}
-	if (*counter)[addresses[indexFrom].Address] >= constant.MaxTxsInBlock {
+	if (*counter)[addresses[indexFrom].Index] >= constant.MaxTxsInBlock {
 		return &types.Transaction{}, errors.New("transaction counter has exceed")
 	}
 	minBalance := fr.NewElement(1)
@@ -273,44 +275,44 @@ func (s *Server) CreateTransaction(addresses []*types.AccountState, counter *map
 		// log.Error("[ERROR] Wrong when generate the transaction: nil hash.")
 		return &types.Transaction{}, errors.New("wrong tx hash")
 	}
-	(*repetitive)[addresses[indexFrom].Address] = append((*repetitive)[addresses[indexFrom].Address], addresses[indexTo].Address)
-	(*noncer)[addresses[indexFrom].Address] += 1
-	(*counter)[addresses[indexFrom].Address] += 1
+	(*repetitive)[addresses[indexFrom].Index] = append((*repetitive)[addresses[indexFrom].Index], addresses[indexTo].Index)
+	(*noncer)[addresses[indexFrom].Index] += 1
+	(*counter)[addresses[indexFrom].Index] += 1
 	newTx.Time = time.Now()
 	return &newTx, nil
 }
 
-func (s *Server) CreateCrossShardTransaction(shardID int, addressMap map[int][]*types.AccountState, counter *map[string]int, repetitive *map[string][]string, noncer *map[string]int64) (*types.Transaction, error) {
-	fmt.Println("The length of addressMap is: ", len(addressMap))
-	txIndexFromInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addressMap[shardID]))))
-	txIndexFrom := int(txIndexFromInt64.Int64())
-	if (*counter)[addressMap[shardID][txIndexFrom].Address] >= constant.MaxTxsInBlock {
+func (s *Server) CreateCrossShardTransaction(shardID int, counter *map[uint64]int, repetitive *map[uint64][]uint64, noncer *map[uint64]int64) (*types.Transaction, error) {
+	fmt.Println("The length of addressMap is: ", len(s.AddressMap))
+	txIndexFromInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(s.AddressMap[shardID]))))
+	txIndexFrom := txIndexFromInt64.Uint64()
+	if (*counter)[s.AddressMap[shardID][txIndexFrom].Index] >= constant.MaxTxsInBlock {
 		return &types.Transaction{}, errors.New("counter has exceed")
 	}
 	minBalance := fr.NewElement(1)
-	if addressMap[shardID][txIndexFrom].Balance.Cmp(&minBalance) == -1 {
+	if s.AddressMap[shardID][txIndexFrom].Balance.Cmp(&minBalance) == -1 {
 		return &types.Transaction{}, errors.New("no sufficient balance")
 	}
 	indexTo := shardID
 	for indexTo == shardID {
 		// 根据 全局 的 constant 计算 目标 shard 是谁
-		indexToInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addressMap))))
+		indexToInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(s.AddressMap))))
 		indexTo = int(indexToInt64.Int64())
 	}
 	fmt.Println("indexTo is: ", indexTo)
-	txIndexToInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(addressMap[indexTo]))))
-	txIndexTo := int(txIndexToInt64.Int64())
+	txIndexToInt64, _ := rand.Int(rand.Reader, big.NewInt(int64(len(s.AddressMap[indexTo]))))
+	txIndexTo := txIndexToInt64.Uint64()
 	// 如果这对组合的交易已经存在的，也不能保留
-	if containsString(addressMap[indexTo][txIndexTo].Address, (*repetitive)[addressMap[shardID][txIndexFrom].Address]) {
+	if containsUint64(s.AddressMap[indexTo][txIndexTo].Index, (*repetitive)[s.AddressMap[shardID][txIndexFrom].Index]) {
 		return &types.Transaction{}, errors.New("repetitive from and to")
 	}
-	newTx := types.NewTransaction(uint64(1), addressMap[shardID][txIndexFrom].PublicKey, addressMap[indexTo][txIndexTo].PublicKey, 0)
+	newTx := types.NewTransaction(uint64(1), s.AddressMap[shardID][txIndexFrom].PublicKey, s.AddressMap[indexTo][txIndexTo].PublicKey, 0)
 	if reflect.DeepEqual(newTx.GenerateTransactionHash(mimc.NewMiMC()), []byte("")) {
 		return &types.Transaction{}, errors.New("wrong tx hash")
 	}
-	(*repetitive)[addressMap[shardID][txIndexFrom].Address] = append((*repetitive)[addressMap[shardID][txIndexFrom].Address], addressMap[indexTo][txIndexTo].Address)
-	(*noncer)[addressMap[shardID][txIndexFrom].Address] += 1
-	(*counter)[addressMap[shardID][txIndexFrom].Address] += 1
+	(*repetitive)[s.AddressMap[shardID][txIndexFrom].Index] = append((*repetitive)[s.AddressMap[shardID][txIndexFrom].Index], s.AddressMap[indexTo][txIndexTo].Index)
+	(*noncer)[s.AddressMap[shardID][txIndexFrom].Index] += 1
+	(*counter)[s.AddressMap[shardID][txIndexFrom].Index] += 1
 	newTx.Time = time.Now()
 	return &newTx, nil
 }
@@ -321,6 +323,15 @@ func send(url string, msg []byte) {
 }
 
 func containsString(item string, items []string) bool {
+	for _, val := range items {
+		if val == item {
+			return true
+		}
+	}
+	return false
+}
+
+func containsUint64(item uint64, items []uint64) bool {
 	for _, val := range items {
 		if val == item {
 			return true
