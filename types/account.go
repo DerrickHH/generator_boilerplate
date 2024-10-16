@@ -18,7 +18,6 @@ type SignatureAccount struct {
 
 type AccountState struct {
 	Index     uint64
-	Address   Address
 	PublicKey eddsa.PublicKey
 	Nonce     uint64
 	Balance   fr.Element
